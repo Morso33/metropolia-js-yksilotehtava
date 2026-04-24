@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="fi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Opiskelijaravintolat</title>
+  <link rel="stylesheet" href="./styles.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <h1>Opiskelijaravintolat</h1>
+      <p class="muted">Päivittäiset ja viikoittaiset ruokalistat Suomessa</p>
+    </div>
+    <div class="topbar-actions">
+      <span id="auth-state" class="pill">Ei kirjautunut</span>
+      <button id="logout-btn" class="button ghost" type="button" hidden>Kirjaudu ulos</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="panel">
+      <h2>Tili</h2>
+      <div class="tabs" role="tablist" aria-label="Kirjautuminen ja rekisteröinti">
+        <button class="tab is-active" type="button" data-auth-tab="login">Kirjaudu</button>
+        <button class="tab" type="button" data-auth-tab="register">Rekisteröidy</button>
+      </div>
+
+      <form id="login-form" class="form stack">
+        <label>Käyttäjätunnus
+          <input name="username" required autocomplete="username">
+        </label>
+        <label>Salasana
+          <input name="password" type="password" required autocomplete="current-password">
+        </label>
+        <button class="button" type="submit">Kirjaudu</button>
+      </form>
+
+      <form id="register-form" class="form stack hidden">
+        <label>Käyttäjätunnus
+          <input name="username" required autocomplete="username">
+        </label>
+        <label>Sähköposti
+          <input name="email" type="email" required autocomplete="email">
+        </label>
+        <label>Salasana
+          <input name="password" type="password" required autocomplete="new-password">
+        </label>
+        <button class="button" type="submit">Luo tili</button>
+      </form>
+    </section>
+
+    <section class="panel">
+      <h2>Oma profiili</h2>
+      <div class="profile-head">
+        <img id="avatar-preview" class="avatar" alt="Profiilikuva">
+        <div>
+          <p id="profile-name" class="title">Ei kirjautunut</p>
+          <p id="profile-email" class="muted">Kirjaudu hallitaksesi profiilia.</p>
+        </div>
+      </div>
+
+      <form id="profile-form" class="form stack">
+        <label>Käyttäjätunnus
+          <input name="username" disabled>
+        </label>
+        <label>Sähköposti
+          <input name="email" type="email" disabled>
+        </label>
+        <label>Uusi salasana (valinnainen)
+          <input name="password" type="password" disabled>
+        </label>
+        <label>Suosikkiravintola
+          <select name="favouriteRestaurant" id="favourite-select" disabled>
+            <option value="">Valitse ravintola</option>
+          </select>
+        </label>
+        <button class="button" type="submit" disabled>Päivitä tiedot</button>
+      </form>
+
+      <form id="avatar-form" class="form stack">
+        <label>Profiilikuva
+          <input name="avatar" type="file" accept="image/*" disabled>
+        </label>
+        <button class="button ghost" type="submit" disabled>Lataa kuva</button>
+      </form>
+    </section>
+
+    <section class="panel panel-wide">
+      <h2>Ravintolat</h2>
+      <div class="filters">
+        <label>Kaupunki
+          <select id="city-filter">
+            <option value="">Kaikki kaupungit</option>
+          </select>
+        </label>
+        <label>Palveluntarjoaja
+          <select id="company-filter">
+            <option value="">Kaikki tarjoajat</option>
+          </select>
+        </label>
+        <label>Haku
+          <input id="search-filter" placeholder="Nimi tai osoite">
+        </label>
+      </div>
+      <p id="restaurant-count" class="muted"></p>
+      <div id="restaurant-list" class="restaurant-list" aria-live="polite"></div>
+    </section>
+
+
+    <section class="panel panel-wide">
+      <h2 id="menu-title">Ruokalistat</h2>
+      <div class="menu-columns">
+        <div>
+          <h3>Päivän menu</h3>
+          <div id="daily-menu" class="menu-box muted">Valitse ravintola nähdäksesi päivän menun.</div>
+        </div>
+        <div>
+          <h3>Viikon menu</h3>
+          <div id="weekly-menu" class="menu-box muted">Valitse ravintola nähdäksesi viikon menun.</div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div id="notice" class="notice" aria-live="assertive"></div>
+  <script src="./app.js" type="module"></script>
+</body>
+</html>
