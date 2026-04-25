@@ -290,6 +290,18 @@ const refreshCurrentUser = async () => {
   populateFavouriteSelect();
 };
 
+const updateFavouriteRestaurant = async (restaurantId) => {
+  if (!state.user) return;
+  await api('/users', {
+    method: 'PUT',
+    auth: true,
+    body: { favouriteRestaurant: restaurantId },
+  });
+  state.user.favouriteRestaurant = restaurantId;
+  renderAuthState();
+  renderRestaurantList();
+  showNotice('Suosikkiravintola päivitetty.');
+};
 
 const setupEvents = () => {
   els.tabs.forEach((tab) => {
@@ -315,3 +327,101 @@ const setupEvents = () => {
     }
   });
 
+  els.registerForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const body = Object.fromEntries(new FormData(els.registerForm).entries());
+    try {
+      await api('/users', { method: 'POST', body });
+      showNotice('Tili luotu. Voit nyt kirjautua.');
+      els.tabs[0].click();
+      els.registerForm.reset();
+    } catch (error) {
+      showNotice(error.message, true);
+    }
+  });
+
+  els.profileForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (!state.user) return;
+    const values = Object.fromEntries(new FormData(els.profileForm).entries());
+    const body = Object.fromEntries(Object.entries(values).filter(([, value]) => isValidFormValue(value)));
+    try {
+      const result = await api('/users', { method: 'PUT', auth: true, body });
+      state.user = result?.data || { ...state.user, ...body };
+      renderAuthState();
+      renderRestaurantList();
+      showNotice('Profiili päivitetty.');
+    } catch (error) {
+      showNotice(error.message, true);
+    }
+  });
+
+  els.avatarForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const file = els.avatarForm.avatar.files?.[0];
+    if (!file) {
+      showNotice('Valitse kuva ladattavaksi.', true);
+      return;
+    }
+    const formData = new FormData();
+    formData.append('avatar', file);
+    try {
+      const result = await api('/users/avatar', {
+        method: 'POST',
+        auth: true,
+        formData: true,
+        body: formData,
+      });
+      const updated = result?.data || {};
+      state.user = { ...state.user, ...updated };
+      renderAuthState();
+      showNotice('Profiilikuva ladattu.');
+      els.avatarForm.reset();
+    } catch (error) {
+      showNotice(error.message, true);
+    }
+  });
+
+  els.logoutBtn.addEventListener('click', () => {
+    state.token = '';
+    state.user = null;
+    localStorage.removeItem(TOKEN_KEY);
+    renderAuthState();
+    renderRestaurantList();
+    showNotice('Kirjauduit ulos.');
+  });
+
+  els.cityFilter.addEventListener('change', applyFilters);
+  els.companyFilter.addEventListener('change', applyFilters);
+  els.searchFilter.addEventListener('input', applyFilters);
+
+  els.restaurantList.addEventListener('click', async (event) => {
+    const button = event.target.closest('button[data-action]');
+    if (!button) return;
+    const id = button.dataset.id;
+    const action = button.dataset.action;
+    if (action === 'show') {
+      await selectRestaurant(id);
+    } else if (action === 'fav') {
+      try {
+        await updateFavouriteRestaurant(id);
+      } catch (error) {
+        showNotice(error.message, true);
+      }
+    }
+  });
+};
+
+
+const init = async () => {
+  setupEvents();
+  renderAuthState();
+  try {
+    await Promise.all([loadRestaurants(), refreshCurrentUser()]);
+    tryResolveUserLocation();
+  } catch (error) {
+    showNotice(`Alustus epäonnistui: ${error.message}`, true);
+  }
+};
+init();
+console.log("LOAD")
