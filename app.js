@@ -233,7 +233,6 @@ const selectRestaurant = async (id) => {
   const restaurant = state.restaurants.find((r) => r._id === id);
   els.menuTitle.textContent = `Ruokalistat — ${restaurant?.name || ''}`;
   renderRestaurantList();
-  renderMap();
 
   els.dailyMenu.textContent = 'Ladataan...';
   els.weeklyMenu.textContent = 'Ladataan...';
@@ -262,6 +261,22 @@ const populateFavouriteSelect = () => {
   });
   els.favouriteSelect.value = currentValue;
 };
+
+const updateNearestRestaurant = () => {
+  if (!state.userCoords || !state.restaurants.length) {
+    state.nearestRestaurantId = '';
+    return;
+  }
+  let best = null;
+  state.restaurants.forEach((restaurant) => {
+    const coords = restaurant?.location?.coordinates;
+    if (!Array.isArray(coords) || coords.length < 2) return;
+    const distance = haversine(state.userCoords.lat, state.userCoords.lon, coords[1], coords[0]);
+    if (!best || distance < best.distance) best = { id: restaurant._id, distance };
+  });
+  state.nearestRestaurantId = best?.id || '';
+};
+
 
 const loadRestaurants = async () => {
   const payload = await api('/restaurants');
@@ -418,7 +433,6 @@ const init = async () => {
   renderAuthState();
   try {
     await Promise.all([loadRestaurants(), refreshCurrentUser()]);
-    tryResolveUserLocation();
   } catch (error) {
     showNotice(`Alustus epäonnistui: ${error.message}`, true);
   }
