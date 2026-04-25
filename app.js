@@ -76,3 +76,242 @@ const api = async (path, options = {}) => {
   }
   return data;
 };
+
+const enableAuthedControls = (isAuthed) => {
+  [...els.profileForm.elements].forEach((el) => {
+    if (el.tagName === 'BUTTON' || el.tagName === 'INPUT' || el.tagName === 'SELECT') {
+      el.disabled = !isAuthed;
+    }
+  });
+  [...els.avatarForm.elements].forEach((el) => {
+    if (el.tagName === 'BUTTON' || el.tagName === 'INPUT') el.disabled = !isAuthed;
+  });
+  els.logoutBtn.hidden = !isAuthed;
+};
+
+const renderAuthState = () => {
+  if (!state.user) {
+    els.authState.textContent = 'Ei kirjautunut';
+    els.profileName.textContent = 'Ei kirjautunut';
+    els.profileEmail.textContent = 'Kirjaudu hallitaksesi profiilia.';
+    els.avatarPreview.src = AVATAR_PLACEHOLDER;
+    enableAuthedControls(false);
+    return;
+  }
+
+  els.authState.textContent = `Kirjautunut: ${state.user.username}`;
+  els.profileName.textContent = state.user.username || '-';
+  els.profileEmail.textContent = state.user.email || '';
+  els.avatarPreview.src = getAvatarUrl(state.user.avatar) || AVATAR_PLACEHOLDER;
+  els.profileForm.username.value = state.user.username || '';
+  els.profileForm.email.value = state.user.email || '';
+  els.profileForm.password.value = '';
+  els.profileForm.favouriteRestaurant.value = state.user.favouriteRestaurant || '';
+  enableAuthedControls(true);
+};
+
+const extractRestaurants = (payload) =>
+  Array.isArray(payload) ? payload : payload?.restaurants || [];
+
+const buildFilterOptions = () => {
+  const cities = [...new Set(state.restaurants.map((r) => r.city).filter(Boolean))].sort();
+  const companies = [...new Set(state.restaurants.map((r) => r.company).filter(Boolean))].sort();
+
+  els.cityFilter.innerHTML = '<option value="">Kaikki kaupungit</option>';
+  cities.forEach((city) => {
+    const option = document.createElement('option');
+    option.value = city;
+    option.textContent = city;
+    els.cityFilter.append(option);
+  });
+
+  els.companyFilter.innerHTML = '<option value="">Kaikki tarjoajat</option>';
+  companies.forEach((company) => {
+    const option = document.createElement('option');
+    option.value = company;
+    option.textContent = company;
+    els.companyFilter.append(option);
+  });
+};
+
+
+
+const isValidFormValue = (value) =>
+  typeof value === 'string' ? value.trim() !== '' : value !== null && value !== undefined;
+
+const applyFilters = () => {
+  const city = els.cityFilter.value.toLowerCase();
+  const company = els.companyFilter.value.toLowerCase();
+  const search = els.searchFilter.value.trim().toLowerCase();
+
+  state.filteredRestaurants = state.restaurants.filter((r) => {
+    const cityMatch = !city || r.city?.toLowerCase() === city;
+    const companyMatch = !company || r.company?.toLowerCase() === company;
+    const searchMatch =
+      !search ||
+      r.name?.toLowerCase().includes(search) ||
+      r.address?.toLowerCase().includes(search);
+    return cityMatch && companyMatch && searchMatch;
+  });
+
+  els.restaurantCount.textContent = `${state.filteredRestaurants.length} ravintolaa`;
+  renderRestaurantList();
+  populateFavouriteSelect();
+};
+
+const favouriteButtonLabel = (id) =>
+  state.user?.favouriteRestaurant === id ? 'Suosikki' : 'Aseta suosikiksi';
+
+const renderRestaurantList = () => {
+  els.restaurantList.innerHTML = '';
+  state.filteredRestaurants.forEach((restaurant) => {
+    const card = document.createElement('article');
+    card.className = 'restaurant-card';
+    if (restaurant._id === state.nearestRestaurantId) card.classList.add('nearest');
+    if (restaurant._id === state.selectedRestaurantId) card.classList.add('selected');
+
+    card.innerHTML = `
+      <div class="card-head">
+        <strong>${restaurant.name || '-'}</strong>
+        <span class="badge">${restaurant.company || 'N/A'}</span>
+      </div>
+      <div class="muted">${restaurant.address || ''}, ${restaurant.city || ''}</div>
+      <div class="muted">${restaurant.phone || ''}</div>
+      ${restaurant._id === state.nearestRestaurantId ? '<div class="badge ok">Lähin</div>' : ''}
+      <div class="actions">
+        <button type="button" data-action="show" data-id="${restaurant._id}">Näytä menut</button>
+        <button type="button" data-action="fav" data-id="${restaurant._id}" ${state.user ? '' : 'disabled'}>
+          ${favouriteButtonLabel(restaurant._id)}
+        </button>
+      </div>
+    `;
+
+    els.restaurantList.append(card);
+  });
+};
+
+const renderDailyMenu = (data) => {
+  const courses = data?.courses || [];
+  if (!courses.length) {
+    els.dailyMenu.textContent = 'Päivän menua ei saatavilla.';
+    return;
+  }
+  els.dailyMenu.innerHTML = courses
+    .map(
+      (c) => `<div class="menu-item">
+        <strong>${c.name || '-'}</strong><br>
+        <span class="muted">${c.price || '-'}</span><br>
+        <span class="muted">${c.diets || ''}</span>
+      </div>`,
+    )
+    .join('');
+};
+
+const renderWeeklyMenu = (data) => {
+  const days = data?.days || [];
+  if (!days.length) {
+    els.weeklyMenu.textContent = 'Viikon menua ei saatavilla.';
+    return;
+  }
+  els.weeklyMenu.innerHTML = days
+    .map((day) => {
+      const items = (day.courses || [])
+        .map(
+          (c) => `<div class="menu-item">
+            <strong>${c.name || '-'}</strong><br>
+            <span class="muted">${c.price || '-'}</span> · <span class="muted">${c.diets || ''}</span>
+          </div>`,
+        )
+        .join('');
+      return `<section class="menu-item"><strong>${day.date || ''}</strong>${items || '<div class="muted">Ei ruokalajeja</div>'}</section>`;
+    })
+    .join('');
+};
+
+const selectRestaurant = async (id) => {
+  state.selectedRestaurantId = id;
+  const restaurant = state.restaurants.find((r) => r._id === id);
+  els.menuTitle.textContent = `Ruokalistat — ${restaurant?.name || ''}`;
+  renderRestaurantList();
+  renderMap();
+
+  els.dailyMenu.textContent = 'Ladataan...';
+  els.weeklyMenu.textContent = 'Ladataan...';
+  try {
+    const [daily, weekly] = await Promise.all([
+      api(`/restaurants/daily/${id}/fi`),
+      api(`/restaurants/weekly/${id}/fi`),
+    ]);
+    renderDailyMenu(daily);
+    renderWeeklyMenu(weekly);
+  } catch (error) {
+    renderDailyMenu(null);
+    renderWeeklyMenu(null);
+    showNotice(error.message, true);
+  }
+};
+
+const populateFavouriteSelect = () => {
+  const currentValue = state.user?.favouriteRestaurant || '';
+  els.favouriteSelect.innerHTML = '<option value="">Valitse ravintola</option>';
+  state.filteredRestaurants.forEach((restaurant) => {
+    const option = document.createElement('option');
+    option.value = restaurant._id;
+    option.textContent = `${restaurant.name} (${restaurant.city || '-'})`;
+    els.favouriteSelect.append(option);
+  });
+  els.favouriteSelect.value = currentValue;
+};
+
+const loadRestaurants = async () => {
+  const payload = await api('/restaurants');
+  state.restaurants = extractRestaurants(payload);
+  buildFilterOptions();
+  updateNearestRestaurant();
+  applyFilters();
+};
+
+const refreshCurrentUser = async () => {
+  if (!state.token) {
+    state.user = null;
+    renderAuthState();
+    return;
+  }
+  try {
+    const result = await api('/users/token', { auth: true });
+    state.user = result?.data || result;
+  } catch {
+    state.token = '';
+    localStorage.removeItem(TOKEN_KEY);
+    state.user = null;
+  }
+  renderAuthState();
+  renderRestaurantList();
+  populateFavouriteSelect();
+};
+
+
+const setupEvents = () => {
+  els.tabs.forEach((tab) => {
+    tab.addEventListener('click', () => {
+      const login = tab.dataset.authTab === 'login';
+      els.tabs.forEach((t) => t.classList.toggle('is-active', t === tab));
+      els.loginForm.classList.toggle('hidden', !login);
+      els.registerForm.classList.toggle('hidden', login);
+    });
+  });
+
+  els.loginForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const body = Object.fromEntries(new FormData(els.loginForm).entries());
+    try {
+      const result = await api('/auth/login', { method: 'POST', body });
+      state.token = result.token;
+      localStorage.setItem(TOKEN_KEY, state.token);
+      await refreshCurrentUser();
+      showNotice('Kirjautuminen onnistui.');
+    } catch (error) {
+      showNotice(error.message, true);
+    }
+  });
+
